@@ -1,0 +1,924 @@
+# Workflow 9 — Complete Master Notes
+## Lead Scoring + CRM Automation
+### AI Automation Freelancer Training — June 2026
+
+---
+
+## এই Workflow কী করে
+
+কেউ Google Form fill করলে AI automatically তাকে score করে।
+Score 80+ হলে owner কে hot lead alert পাঠায়।
+80-এর কম হলে lead কে nurture email পাঠায়।
+সব data CRM Sheet-এ save হয়।
+আমি ঘুমিয়ে থাকলেও সব automatic।
+
+---
+
+## Tools যা লাগলো
+
+```
+Google Form   → Lead collect করতে
+Google Sheets → Data store করতে
+n8n           → Automation চালাতে
+OpenAI        → Lead score করতে
+Gmail         → Email পাঠাতে
+```
+
+---
+
+## Full Flow
+
+```
+কেউ Form fill করলো
+        ↓
+01 - Watch New Lead
+(প্রতি ১ মিনিটে Sheet চেক করে)
+        ↓
+02 - Extract Lead Data
+(লম্বা column name → short নাম)
+        ↓
+03 - AI Lead Scoring
+(GPT-4o-mini দিয়ে score করে)
+        ↓
+04 - Parse AI Score
+(AI-এর text → number বানায়)
+        ↓
+05 - Check Lead Score
+(score >= 80?)
+       ↓              ↓
+    TRUE           FALSE
+  (Hot Lead)    (Warm/Cold)
+       ↓              ↓
+06 - Save to CRM (দুই branch-ই)
+       ↓              ↓
+07 - Alert       08 - Nurture
+Owner Email     Email to Lead
+```
+
+---
+
+---
+
+# Episode 1 — Google Form বানানো
+
+## কী বানালাম
+Digital Marketing Agency-র জন্য একটা Lead Capture Form।
+যে form fill করবে সে potential client।
+AI তাকে score করবে।
+
+## কীভাবে বানালাম
+```
+Browser → forms.google.com → Blank form
+
+Title      : Free Consultation Request
+Description: আমাদের Digital Marketing Expert-এর
+             সাথে কথা বলুন — সম্পূর্ণ বিনামূল্যে!
+```
+
+## 7টা Questions
+
+```
+Question 1:
+Name    : Your Full Name
+Type    : Short answer
+Required: ON
+
+Question 2:
+Name    : Email Address
+Type    : Short answer
+Required: ON
+
+Question 3:
+Name    : Phone Number
+Type    : Short answer
+Required: ON
+
+Question 4:
+Name    : What is your Business?
+Type    : Short answer
+Required: ON
+
+Question 5:
+Name    : What is your Monthly Marketing Budget?
+Type    : Multiple choice
+Required: ON
+Options :
+  ○ Less than $500
+  ○ $500 - $1000
+  ○ $1000 - $5000
+  ○ More than $5000
+
+Question 6:
+Name    : When do you want to start?
+Type    : Multiple choice
+Required: ON
+Options :
+  ○ Immediately (this week)
+  ○ Within 1 month
+  ○ Within 3 months
+  ○ Just exploring
+
+Question 7:
+Name    : Have you done Digital Marketing before?
+Type    : Multiple choice
+Required: ON
+Options :
+  ○ Yes, with good results
+  ○ Yes, but didn't work well
+  ○ No, completely new
+```
+
+## Form → Sheets Connect করলাম
+```
+Form → Responses tab → Sheets icon (সবুজ)
+→ Create a new spreadsheet
+→ নাম: Workflow 9 - Lead CRM
+→ Create
+```
+
+## Test Data যা দিলাম
+```
+Name      : Rahim Uddin
+Email     : rahim@gmail.com
+Phone     : 01712345678
+Business  : Clothing Shop
+Budget    : $1000 - $5000
+Start     : Immediately (this week)
+Experience: Yes, with good results
+```
+
+## কেন এই Questions বেছে নিলাম
+Budget, urgency, experience — এই ৩টা দিয়ে বোঝা যায়
+কেউ real client হবে কিনা।
+High budget + immediately + experience = Hot Lead।
+AI এই ৩টা দেখেই score করে।
+Form-এর questions আগে ঠিক করতে হয়।
+Business logic না বুঝে form বানালে AI ভালো score করতে পারে না।
+
+---
+
+---
+
+# Episode 2 — Node 01 — Watch New Lead
+
+## Node Info
+```
+Node Type: Google Sheets Trigger
+Node Name: 01 - Watch New Lead
+কাজ     : প্রতি ১ মিনিটে Sheet চেক করে
+           নতুন row আসলে workflow চালু করে
+```
+
+## কীভাবে বানালাম
+```
+n8n → New Workflow
+নাম : Workflow 9 - Lead Scoring CRM
+
+Canvas-এ "+" চাপলাম
+Search : Google Sheets Trigger
+Select করলাম
+Rename : 01 - Watch New Lead
+```
+
+## Config
+```
+Credential : Google account connect করলাম
+Trigger On : Row Added
+Spreadsheet: Workflow 9 - Lead CRM
+Sheet      : Form Responses 1
+Poll Times : Every 1 Minute
+```
+
+## Test করলাম
+```
+"Fetch Test Event" চাপলাম
+→ Rahim Uddin-এর data দেখালো ✅
+```
+
+## কেন এই Node
+এটা workflow-এর চোখ।
+আমি ঘুমিয়ে থাকলেও প্রতি ১ মিনিটে চেক করে।
+নতুন lead আসলে বাকি সব automatic চলে।
+Google Sheets Trigger real-time না — ১ মিনিট পরপর চেক করে।
+Business-এর জন্য এটা যথেষ্ট।
+Instant দরকার হলে webhook লাগবে — সেটা advanced topic।
+
+## সবচেয়ে বড় Mistake যা করিনি
+Form Response Sheet-এ কখনো write করিনি।
+Form নিজেই সেখানে লেখে।
+n8n আবার লিখলে double row হয়।
+এটাই সবচেয়ে common mistake — সবাই এটা করে।
+
+---
+
+---
+
+# Episode 3 — Node 02 — Extract Lead Data
+
+## Node Info
+```
+Node Type: Edit Fields (Set)
+Node Name: 02 - Extract Lead Data
+কাজ     : Form-এর লম্বা column name → short নাম দেয়
+```
+
+## কীভাবে বানালাম
+```
+Node 01-এর ডানে "+"
+Search : Edit Fields
+Select করলাম
+Rename : 02 - Extract Lead Data
+Mode   : Manual Mapping
+```
+
+## Config — 7টা Field
+
+```
+Field 1:
+Name : name
+Type : String
+Value: {{ $json["Your Full Name"] }}
+
+Field 2:
+Name : email
+Type : String
+Value: {{ $json["Email Address"] }}
+
+Field 3:
+Name : phone
+Type : String
+Value: {{ $json["Phone Number"] }}
+
+Field 4:
+Name : business
+Type : String
+Value: {{ $json["What is your Business?"] }}
+
+Field 5:
+Name : budget
+Type : String
+Value: {{ $json["What is your Monthly Marketing Budget?"] }}
+
+Field 6:
+Name : start_time
+Type : String
+Value: {{ $json["When do you want to start?"] }}
+
+Field 7:
+Name : experience
+Type : String
+Value: {{ $json["Have you done Digital Marketing before?"] }}
+```
+
+## Test Output
+```
+name      : "Rahim Uddin"
+email     : "rahim@gmail.com"
+phone     : "01712345678"
+business  : "Clothing Shop"
+budget    : "$1000 - $5000"
+start_time: "Immediately (this week)"
+experience: "Yes, with good results"
+```
+
+## কেন এই Node
+Form-এর column name গুলো অনেক লম্বা।
+বারবার পুরো sentence লিখতে গেলে ভুল হয়, সময় নষ্ট হয়।
+একবার short নাম দিয়ে রাখলাম।
+পরের সব node এই short নাম use করে।
+Professional workflow-এ data clean করার জন্য আলাদা node রাখতে হয়।
+এতে পরে debug করা সহজ হয়।
+
+---
+
+---
+
+# Episode 4 — Node 03 — AI Lead Scoring
+
+## Node Info
+```
+Node Type : OpenAI
+Node Name : 03 - AI Lead Scoring
+Model     : GPT-4o-mini
+Operation : Message a Model
+কাজ      : Lead-এর data দেখে 0-100 score দেয়
+```
+
+## কীভাবে বানালাম
+```
+Node 02-এর ডানে "+"
+Search    : OpenAI
+Select করলাম
+Rename    : 03 - AI Lead Scoring
+Credential: OpenAI API Key
+Resource  : Text
+Operation : Message a Model
+Model     : GPT-4o-mini
+```
+
+## System Prompt
+```
+You are a lead scoring expert for a digital
+marketing agency.
+
+Your job is to analyze leads and give them
+a score from 0 to 100 based on these rules:
+
+BUDGET SCORING (40 points max):
+- More than $5000 = 40 points
+- $1000 - $5000 = 30 points
+- $500 - $1000 = 15 points
+- Less than $500 = 5 points
+
+URGENCY SCORING (35 points max):
+- Immediately (this week) = 35 points
+- Within 1 month = 25 points
+- Within 3 months = 10 points
+- Just exploring = 0 points
+
+EXPERIENCE SCORING (25 points max):
+- Yes, with good results = 25 points
+- Yes, but didn't work well = 15 points
+- No, completely new = 10 points
+
+RESPONSE FORMAT:
+Return ONLY a valid JSON object.
+No extra text. No explanation.
+
+{
+  "score": <number between 0-100>,
+  "grade": "<Hot/Warm/Cold>",
+  "reason": "<one line explanation in English>"
+}
+
+Grade rules:
+- Score 80-100 = Hot
+- Score 50-79  = Warm
+- Score 0-49   = Cold
+```
+
+## User Message
+```
+Please score this lead:
+
+Name      : {{ $json.name }}
+Business  : {{ $json.business }}
+Budget    : {{ $json.budget }}
+Start Time: {{ $json.start_time }}
+Experience: {{ $json.experience }}
+```
+
+## Test Output
+```
+{
+  "score" : 100,
+  "grade" : "Hot",
+  "reason": "High budget, immediate start,
+             and positive experience."
+}
+```
+
+## কেন এই Node
+AI-কে rules না দিলে নিজের মতো score করে — consistent না।
+Rules দিলে সবসময় same logic-এ score করে।
+"Return ONLY JSON" বললাম কারণ extra text থাকলে
+পরে parse করা যায় না।
+Prompt Engineering মানে AI-কে ঠিকমতো বলতে জানা।
+এটা জানলে freelancer হিসেবে আলাদা হওয়া যায়।
+
+---
+
+---
+
+# Episode 5 — Node 04 — Parse AI Score
+
+## Node Info
+```
+Node Type: Code Node
+Node Name: 04 - Parse AI Score
+Language : JavaScript
+Mode     : Run Once for All Items
+কাজ     : AI-এর text থেকে score, grade, reason বের করে
+```
+
+## কীভাবে বানালাম
+```
+Node 03-এর ডানে "+"
+Search  : Code
+Select করলাম
+Rename  : 04 - Parse AI Score
+Language: JavaScript
+Mode    : Run Once for All Items
+```
+
+## Code
+```javascript
+const items = $input.all();
+const results = [];
+
+for (const item of items) {
+  // AI response text নাও
+  const rawText = item.json.output[0].content[0].text;
+
+  // JSON parse করো
+  const parsed = JSON.parse(rawText);
+
+  // সব data একসাথে রাখো
+  results.push({
+    json: {
+      name      : $('02 - Extract Lead Data').item.json.name,
+      email     : $('02 - Extract Lead Data').item.json.email,
+      phone     : $('02 - Extract Lead Data').item.json.phone,
+      business  : $('02 - Extract Lead Data').item.json.business,
+      budget    : $('02 - Extract Lead Data').item.json.budget,
+      start_time: $('02 - Extract Lead Data').item.json.start_time,
+      experience: $('02 - Extract Lead Data').item.json.experience,
+      score     : Number(parsed.score),
+      grade     : parsed.grade,
+      reason    : parsed.reason
+    }
+  });
+}
+
+return results;
+```
+
+## Test Output
+```
+name      : "Rahim Uddin"
+email     : "rahim@gmail.com"
+phone     : "01712345678"
+business  : "Clothing Shop"
+budget    : "$1000 - $5000"
+start_time: "Immediately (this week)"
+experience: "Yes, with good results"
+score     : 100
+grade     : "Hot"
+reason    : "High budget, immediate start..."
+```
+
+## কেন এই Node
+AI-এর response plain text — n8n সেটাকে number বোঝে না।
+এখানে text থেকে number বের করলাম।
+Number() দিলাম কারণ IF node number চায়, string না।
+Node 02-এর data আবার নিলাম কারণ Node 03 সেটা forward করে না।
+
+## সবচেয়ে গুরুত্বপূর্ণ জিনিস
+```
+2026-এ n8n OpenAI response path:
+output[0].content[0].text
+
+পুরনো format আর কাজ করে না:
+message.content ❌
+
+Number() না দিলে IF node কাজ করে না:
+score: Number(parsed.score) ✅
+score: parsed.score ❌
+```
+
+---
+
+---
+
+# Episode 6 — Node 05 — Check Lead Score
+
+## Node Info
+```
+Node Type: IF Node
+Node Name: 05 - Check Lead Score
+কাজ     : Score দেখে দুই ভাগ করে
+           Hot lead আর Warm/Cold lead
+```
+
+## কীভাবে বানালাম
+```
+Node 04-এর ডানে "+"
+Search : IF
+Select করলাম
+Rename : 05 - Check Lead Score
+```
+
+## Config
+```
+Value 1  : {{ $json.score }}
+Operation: Greater than or equal to
+Value 2  : 80
+Convert types where required: ON ✅
+```
+
+## Output
+```
+True Branch  → score >= 80 → Hot Lead  🔥
+False Branch → score < 80  → Warm/Cold ❄️
+```
+
+## কেন এই Node
+এটা workflow-এর decision maker।
+একটা node দিয়ে দুই ভাগ হয়ে যায়।
+Hot lead-এর জন্য আলাদা action।
+Cold-এর জন্য আলাদা action।
+Convert types ON রাখতেই হবে।
+না রাখলে string "100" আর number 100 আলাদা।
+IF node কাজ করে না।
+এটা সবচেয়ে common bug।
+
+---
+
+---
+
+# Episode 7 — Google Sheets CRM Setup
+
+## কীভাবে বানালাম
+```
+Workflow 9 - Lead CRM Sheet খুললাম
+নিচে "+" চাপলাম
+নতুন tab-এর নাম: CRM Data
+```
+
+## CRM Data Sheet Headers
+```
+A1: Timestamp
+B1: Name
+C1: Email
+D1: Phone
+E1: Business
+F1: Budget
+G1: Start Time
+H1: Experience
+I1: Score
+J1: Grade
+K1: Reason
+L1: Status
+```
+
+## দুইটা Sheet কীভাবে কাজ করে
+```
+Sheet 1 — Form Responses 1:
+→ Google Form automatically লেখে
+→ n8n শুধু READ করে
+→ কখনো manually edit করবো না
+→ touch করবো না
+
+Sheet 2 — CRM Data:
+→ n8n লেখে
+→ Score, grade, reason সহ clean data
+→ Client কে এই sheet দেখাবো
+→ এখানেই সব CRM data থাকে
+```
+
+## কেন আলাদা Sheet
+Form Sheet-এ লিখলে double row হয়।
+CRM Sheet-এ score, grade, reason সহ সব clean data থাকে।
+এটাই professional approach।
+একটা Spreadsheet — দুইটা আলাদা Sheet।
+
+---
+
+---
+
+# Episode 8 — Node 06 — Save to CRM
+
+## Node Info
+```
+Node Type: Google Sheets — Append Row
+Node Name: 06 - Save to CRM
+কাজ     : Hot আর Cold দুই lead-ই CRM Sheet-এ save করে
+Connect : True branch + False branch দুইটাই
+```
+
+## কীভাবে বানালাম
+```
+Node 05 True branch-এ "+"
+Search   : Google Sheets
+Select করলাম
+Rename   : 06 - Save to CRM
+Operation: Append Row
+Document : Workflow 9 - Lead CRM
+Sheet    : CRM Data
+Mapping  : Map Each Column Manually
+
+তারপর Node 05 False branch থেকেও
+Node 06-এ connect করলাম
+(দুই branch-ই এই node-এ আসে)
+```
+
+## Column Mapping
+```
+Timestamp  → {{ $now.toISO() }}
+Name       → {{ $('04 - Parse AI Score').item.json.name }}
+Email      → {{ $('04 - Parse AI Score').item.json.email }}
+Phone      → {{ $('04 - Parse AI Score').item.json.phone }}
+Business   → {{ $('04 - Parse AI Score').item.json.business }}
+Budget     → {{ $('04 - Parse AI Score').item.json.budget }}
+Start Time → {{ $('04 - Parse AI Score').item.json.start_time }}
+Experience → {{ $('04 - Parse AI Score').item.json.experience }}
+Score      → {{ $('04 - Parse AI Score').item.json.score }}
+Grade      → {{ $('04 - Parse AI Score').item.json.grade }}
+Reason     → {{ $('04 - Parse AI Score').item.json.reason }}
+Status     → New
+```
+
+## কেন এই Node
+Hot আর Cold দুই lead-ই CRM-এ রাখলাম।
+আজকের Cold lead কালকে Hot হতে পারে।
+সব track করাটাই professional CRM।
+Status "New" দিলাম — পরে manually "Contacted" বা "Closed" করা যাবে।
+
+## সবচেয়ে গুরুত্বপূর্ণ জিনিস
+```
+IF node-এর পরে $json কাজ করে না।
+Node name দিয়ে refer করতে হয়:
+
+সঠিক ✅:
+$('04 - Parse AI Score').item.json.name
+
+ভুল ❌:
+$json.name
+```
+
+## Node 06 দুই Branch-এ Connect করতে হবে
+```
+True branch  → Node 06 → Hot lead save ✅
+False branch → Node 06 → Cold lead save ✅
+না করলে শুধু Hot lead CRM-এ যাবে।
+```
+
+---
+
+---
+
+# Episode 9 — Node 07 — Alert Owner Hot Lead
+
+## Node Info
+```
+Node Type: Gmail — Send Email
+Node Name: 07 - Alert Owner Hot Lead
+Connect  : True branch only (score >= 80)
+কাজ     : Hot lead আসলে owner কে সাথে সাথে email করে
+```
+
+## কীভাবে বানালাম
+```
+Node 06-এর ডানে "+"
+Search    : Gmail
+Select করলাম
+Rename    : 07 - Alert Owner Hot Lead
+Operation : Send Email
+Credential: Gmail account
+```
+
+## Email Config
+```
+To: নিজের email address
+
+Subject:
+🔥 Hot Lead: {{ $('04 - Parse AI Score').item.json.name }} (Score: {{ $('04 - Parse AI Score').item.json.score }})
+
+Body:
+Hi,
+
+A new HOT lead just came in!
+
+👤 Name     : {{ $('04 - Parse AI Score').item.json.name }}
+📧 Email    : {{ $('04 - Parse AI Score').item.json.email }}
+📞 Phone    : {{ $('04 - Parse AI Score').item.json.phone }}
+🏢 Business : {{ $('04 - Parse AI Score').item.json.business }}
+💰 Budget   : {{ $('04 - Parse AI Score').item.json.budget }}
+🚀 Start    : {{ $('04 - Parse AI Score').item.json.start_time }}
+⭐ Score    : {{ $('04 - Parse AI Score').item.json.score }}/100
+🏷️ Grade   : {{ $('04 - Parse AI Score').item.json.grade }}
+📝 Reason   : {{ $('04 - Parse AI Score').item.json.reason }}
+
+Call them NOW before they go to your competitor!
+
+Best,
+Your Lead Bot 🤖
+```
+
+## কেন এই Node
+Hot lead মিস করা মানে টাকা মিস করা।
+এই email সাথে সাথে জানায়।
+Phone করে ফেলি।
+কোনো manual check লাগে না।
+Automation-এর আসল কাজ এটাই।
+ব্যস্ত থাকলেও কিছু miss হয় না।
+
+---
+
+---
+
+# Episode 10 — Node 08 — Send Nurture Email
+
+## Node Info
+```
+Node Type: Gmail — Send Email
+Node Name: 08 - Send Nurture Email
+Connect  : False branch only (score < 80)
+কাজ     : Warm/Cold lead কে automatically follow up email পাঠায়
+```
+
+## কীভাবে বানালাম
+```
+Node 05 False branch-এ "+"
+Search    : Gmail
+Select করলাম
+Rename    : 08 - Send Nurture Email
+Operation : Send Email
+Credential: Gmail account
+```
+
+## Email Config
+```
+To:
+{{ $('04 - Parse AI Score').item.json.email }}
+
+Subject:
+Thank you for your interest, {{ $('04 - Parse AI Score').item.json.name }}! 🙌
+
+Body:
+Hi {{ $('04 - Parse AI Score').item.json.name }},
+
+Thank you for reaching out to us!
+
+We noticed you're interested in Digital Marketing
+for your {{ $('04 - Parse AI Score').item.json.business }} business.
+
+We'd love to help you grow! Here's what we offer:
+
+✅ Social Media Marketing
+✅ Google & Facebook Ads
+✅ SEO & Content Marketing
+✅ Email Marketing Automation
+
+Whenever you're ready to take the next step,
+we're here for you!
+
+👉 Book a FREE consultation: [your-link-here]
+
+Looking forward to working with you!
+
+Best regards,
+Your Digital Marketing Team 🚀
+```
+
+## কেন এই Node
+Cold lead মানে "না" না — মানে "এখনো ready না।"
+Nurture email দিয়ে relationship রাখলাম।
+৩ মাস পরে হয়তো এই লোকই বড় client হবে।
+Professional sales funnel-এ সবাইকে follow up করতে হয়।
+Automation দিয়ে এটা automatic হয়ে গেলো।
+আলাদা করে মনে রাখতে হয় না।
+
+---
+
+---
+
+# সব Lessons একসাথে
+
+```
+Lesson 1 — Double Row Problem:
+Form Sheet → শুধু READ করো
+CRM Sheet  → n8n WRITE করে
+দুইটা আলাদা রাখলেই সমস্যা নেই
+
+Lesson 2 — OpenAI Response Path (2026 n8n):
+output[0].content[0].text ✅
+message.content ❌ (পুরনো, আর কাজ করে না)
+
+Lesson 3 — Type Mismatch Fix:
+score: Number(parsed.score) ✅
+IF node-এ Convert types: ON ✅
+না করলে string vs number error আসে
+
+Lesson 4 — IF Node-এর পরে Data নিতে:
+$('04 - Parse AI Score').item.json.name ✅
+$json.name ❌ (IF-এর পরে কাজ করে না)
+
+Lesson 5 — Prompt Engineering:
+"Return ONLY JSON" বললে
+AI extra text দেয় না
+Parse করা সহজ হয়
+
+Lesson 6 — Node 06 দুই Branch-এ Connect:
+True  → Node 06 → Hot lead save ✅
+False → Node 06 → Cold lead save ✅
+একটা node-ই দুই কাজ করে
+```
+
+---
+
+# AI Scoring Rules
+
+```
+Budget (40 points max):
+More than $5000    → 40 points
+$1000 - $5000      → 30 points
+$500 - $1000       → 15 points
+Less than $500     → 5 points
+
+Urgency (35 points max):
+Immediately        → 35 points
+Within 1 month     → 25 points
+Within 3 months    → 10 points
+Just exploring     → 0 points
+
+Experience (25 points max):
+Yes, good results  → 25 points
+Yes, bad results   → 15 points
+No experience      → 10 points
+
+Grade:
+80-100 = Hot  🔥
+50-79  = Warm 🌡️
+0-49   = Cold ❄️
+```
+
+---
+
+# Spreadsheet Info
+
+```
+Name: Workflow 9 - Lead CRM
+ID  : 1LHjwqHANGoUcCM8OyfWMZeY7oxv3njS2ne7wEy6Rq_Q
+
+Sheet 1: Form Responses 1 → Form লেখে (touch করবো না)
+Sheet 2: CRM Data         → n8n লেখে (আমার CRM)
+```
+
+---
+
+# Freelancer হিসেবে এই Workflow বিক্রি করবো
+
+```
+কাদের কাছে:
+→ Digital Marketing Agency
+→ Real Estate Agent
+→ Insurance Company
+→ Coaching Business
+→ যেকোনো business যারা lead collect করে
+
+কত charge করবো:
+→ Setup        : $200 - $500
+→ Monthly      : $50 - $100
+
+Client কে কী বলবো:
+"আপনার form-এ যে lead আসে AI automatically
+score করে। Hot lead হলে সাথে সাথে আপনাকে
+alert করে। Cold lead কে automatic email পাঠায়।
+সব data CRM-এ save থাকে।
+আপনাকে কিছু করতে হবে না।"
+```
+
+---
+
+# Node Summary — একনজরে
+
+```
+01 - Watch New Lead
+     → Google Sheets Trigger
+     → Form Responses 1
+     → Every 1 Minute
+
+02 - Extract Lead Data
+     → Edit Fields (Set)
+     → 7 fields: name, email, phone,
+       business, budget, start_time, experience
+
+03 - AI Lead Scoring
+     → OpenAI GPT-4o-mini
+     → System Prompt + User Message
+     → Returns JSON: score, grade, reason
+
+04 - Parse AI Score
+     → Code Node JavaScript
+     → output[0].content[0].text
+     → Number(parsed.score)
+     → Node 02-এর data + AI score একসাথে
+
+05 - Check Lead Score
+     → IF Node
+     → score >= 80
+     → Convert types: ON
+     → True = Hot | False = Warm/Cold
+
+06 - Save to CRM
+     → Google Sheets Append Row
+     → CRM Data Sheet
+     → True + False দুই branch
+     → $('04 - Parse AI Score').item.json.xxx
+
+07 - Alert Owner Hot Lead
+     → Gmail Send Email
+     → True branch only
+     → Owner-এর email-এ Hot Lead alert
+
+08 - Send Nurture Email
+     → Gmail Send Email
+     → False branch only
+     → Lead-এর email-এ follow up
+```
+
+---
+
+*Workflow 9 Complete ✅*
+*June 2026 — AI Automation Freelancer Training*
